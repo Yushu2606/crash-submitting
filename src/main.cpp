@@ -1,36 +1,48 @@
-#include "main.h"
+#include <stdexcept>
+#include <minhook.h>
+#include <nlohmann/json.hpp>
+#include <cpr/cpr.h>
 
-MESSAGEBOXW fpMessageBoxW = NULL;
-const char* URL = NULL;
+#include "main.h"
+#include "utils.h"
 
 static int WINAPI DetourMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType)
 {
-    if (URL == NULL) {
-        return fpMessageBoxW(hWnd, lpText, lpCaption, uType);
-    }
+    try
+    {
+        std::string title = ConvertLPCWSTRToString(lpCaption);
+        std::string text = ConvertLPCWSTRToString(lpText);
+        nlohmann::json j{
+            {"title", title},
+            {"text", text} };
 
-    try {
-        nlohmann::json j{ {"title", ConvertLPCWSTRToString(lpCaption)}, {"text", ConvertLPCWSTRToString(lpText)}};
-        cpr::AsyncResponse p = cpr::PostAsync(cpr::Url(URL), cpr::Body(j.dump()));
+        cpr::Url url(URL);
+        cpr::Body body(j.dump());
+        cpr::AsyncResponse p = cpr::PostAsync(url, body);
+        if (!p.valid())
+        {
+            MessageBoxA(NULL, "Is not a vaild post request.", "SUBMIT ERROR", MB_ICONERROR);
+        }
+
         int result = fpMessageBoxW(hWnd, lpText, lpCaption, uType);
         p.wait();
+        cpr::Response r = p.get();
+        if (r.error)
+        {
+            MessageBoxA(NULL, r.error.message.c_str(), "SUBMIT ERROR", MB_ICONERROR);
+        }
         return result;
-    } catch (std::exception& e) {
-        MessageBoxA(hWnd, e.what(), "SUBMIT ERROR", uType);
+    }
+    catch (std::exception& e)
+    {
+        MessageBoxA(NULL, e.what(), "SUBMIT ERROR", MB_ICONERROR);
         return fpMessageBoxW(hWnd, lpText, lpCaption, uType);
     }
 }
 
-static std::string ConvertLPCWSTRToString(LPCWSTR lpcwstr) {
-    int size_needed = WideCharToMultiByte(CP_UTF8, 0, lpcwstr, -1, NULL, 0, NULL, NULL);
-    std::string strTo(size_needed, 0);
-    WideCharToMultiByte(CP_UTF8, 0, lpcwstr, -1, &strTo[0], size_needed, NULL, NULL);
-    return strTo;
-}
-
-BOOL start_hook(const char* url)
+BOOL start_hook(LPCSTR url)
 {
-    URL = url;
+    URL = std::string(url);
 
     if (MH_Initialize() != MH_OK)
     {
