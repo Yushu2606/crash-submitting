@@ -13,6 +13,7 @@ end
 target("crash_submitting")
     add_cxflags("/utf-8")
     add_defines(
+        "DBGHELP_TRANSLATE_TCHAR",
         "NOMINMAX", -- To avoid conflicts with std::min and std::max.
         "UNICODE", -- To enable Unicode support in Windows API.
         "WIN32_LEAN_AND_MEAN"
@@ -26,3 +27,4 @@ target("crash_submitting")
         "nlohmann_json",
         "cpr"
     )
+    add_syslinks("dbghelp")

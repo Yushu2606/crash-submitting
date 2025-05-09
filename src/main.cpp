@@ -4,6 +4,7 @@
 #include <cpr/cpr.h>
 
 #include "main.h"
+#include "crash.h"
 #include "utils.h"
 
 static int WINAPI DetourMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType)
@@ -43,6 +44,9 @@ static int WINAPI DetourMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption
 BOOL start_hook(LPCSTR url)
 {
     URL = std::string(url);
+
+    AddVectoredExceptionHandler(1, uncatchableExceptionHandler);
+    SetUnhandledExceptionFilter(unhandledExceptionFilter);
 
     if (MH_Initialize() != MH_OK)
     {

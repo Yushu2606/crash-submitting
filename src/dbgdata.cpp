@@ -1,0 +1,230 @@
+// From github.com@LiteLDev/LeviLamina:main@src/ll/api/utils/StacktraceUtils_win.cpp
+
+#include "crash.h"
+#include "dbgdata.h"
+
+#include "dbghelp.h"
+#include "dbgeng.h"
+#include "psapi.h"
+
+#include <filesystem>
+#include <stacktrace>
+
+static void lockRelease() noexcept;
+
+class [[nodiscard]] DbgEngData {
+public:
+    // NOLINTBEGIN(readability-convert-member-functions-to-static)
+    DbgEngData() noexcept { AcquireSRWLockExclusive(&srw); }
+
+    ~DbgEngData() { ReleaseSRWLockExclusive(&srw); }
+
+    DbgEngData(DbgEngData const&) = delete;
+    DbgEngData& operator=(DbgEngData const&) = delete;
+
+    void release() noexcept {
+        // "Phoenix singleton" - destroy and set to null, so that it can be initialized later again
+
+        if (debugClient != NULL) {
+            if (attached) {
+                (void)debugClient->DetachProcesses();
+                attached = false;
+            }
+
+            debugClient->Release();
+            debugClient = NULL;
+        }
+
+        if (debugControl != NULL) {
+            debugControl->Release();
+            debugControl = NULL;
+        }
+
+        if (debugSymbols != NULL) {
+            debugSymbols->Release();
+            debugSymbols = NULL;
+        }
+
+        if (dbgEng != NULL) {
+            (void)FreeLibrary(dbgEng);
+            dbgEng = NULL;
+        }
+
+        initializeAttempted = false;
+    }
+
+    template <std::invocable<wchar_t*, size_t, size_t&> Fn>
+    [[nodiscard]] inline std::optional<std::wstring> adaptFixedSizeToAllocatedResult(Fn&& callback) noexcept {
+        constexpr size_t arraySize = 256;
+
+        wchar_t value[arraySize]{};
+        size_t  valueLengthNeededWithNull{};
+
+        std::optional<std::wstring> result{ std::in_place };
+
+        if (!std::invoke(std::forward<Fn>(callback), value, arraySize, valueLengthNeededWithNull)) {
+            result.reset();
+            return result;
+        }
+        if (valueLengthNeededWithNull <= arraySize) {
+            return std::optional<std::wstring>{std::in_place, value, valueLengthNeededWithNull - 1};
+        }
+        do {
+            result->resize(valueLengthNeededWithNull - 1);
+            if (!std::invoke(std::forward<Fn>(callback), result->data(), result->size() + 1, valueLengthNeededWithNull)) {
+                result.reset();
+                return result;
+            }
+        } while (valueLengthNeededWithNull > result->size() + 1);
+        if (valueLengthNeededWithNull <= result->size()) {
+            result->resize(valueLengthNeededWithNull - 1);
+        }
+        return result;
+    }
+
+    std::optional<std::filesystem::path> getModulePath(void* handle, void* process = NULL) {
+        return adaptFixedSizeToAllocatedResult(
+            [module = (HMODULE)handle,
+            process](wchar_t* value, size_t valueLength, size_t& valueLengthNeededWithNul) -> bool {
+                DWORD  copiedCount{};
+                size_t valueUsedWithNul{};
+                bool   copyFailed{};
+                bool   copySucceededWithNoTruncation{};
+                if (process != NULL) {
+                    // GetModuleFileNameExW truncates and provides no error or other indication it has done so.
+                    // The only way to be sure it didn't truncate is if it didn't need the whole buffer. The
+                    // count copied to the buffer includes the nul-character as well.
+                    copiedCount = GetModuleFileNameEx(process, module, value, static_cast<DWORD>(valueLength));
+                    valueUsedWithNul = static_cast<size_t>(copiedCount) + 1;
+                    copyFailed = (0 == copiedCount);
+                    copySucceededWithNoTruncation = !copyFailed && (copiedCount < valueLength - 1);
+                }
+                else {
+                    // In cases of insufficient buffer, GetModuleFileNameW will return a value equal to
+                    // lengthWithNull and set the last error to ERROR_INSUFFICIENT_BUFFER. The count returned does
+                    // not include the nul-character
+                    copiedCount = ::GetModuleFileNameW(module, value, static_cast<DWORD>(valueLength));
+                    valueUsedWithNul = static_cast<size_t>(copiedCount) + 1;
+                    copyFailed = (0 == copiedCount);
+                    copySucceededWithNoTruncation = !copyFailed && (copiedCount < valueLength);
+                }
+                if (copyFailed) {
+                    return false;
+                }
+                // When the copy truncated, request another try with more space.
+                valueLengthNeededWithNul = copySucceededWithNoTruncation ? valueUsedWithNul : (valueLength * 2);
+                return true;
+            }
+        ).transform([](auto&& path) { return std::filesystem::path(path); });
+    }
+    
+    [[nodiscard]] bool tryInit() noexcept {
+        if (!initializeAttempted) {
+            initializeAttempted = true;
+
+            if (std::atexit(lockRelease) != 0) {
+                return false;
+            }
+
+            dbgEng = LoadLibraryExW(L"dbgeng.dll", NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
+
+            if (dbgEng != NULL) {
+                const auto debug_create =
+                    reinterpret_cast<decltype(&DebugCreate)>(GetProcAddress(dbgEng, "DebugCreate"));
+
+                // Deliberately not calling CoInitialize[Ex]. DbgEng.h API works fine without it.
+                // COM initialization may have undesired interference with user's code.
+                if (debug_create != NULL
+                    && SUCCEEDED(debug_create(IID_IDebugClient, reinterpret_cast<void**>(&debugClient)))
+                    && SUCCEEDED(
+                        debugClient->QueryInterface(IID_IDebugSymbols3, reinterpret_cast<void**>(&debugSymbols))
+                    )
+                    && SUCCEEDED(debugClient->QueryInterface(IID_IDebugControl, reinterpret_cast<void**>(&debugControl))
+                    )) {
+                    attached = SUCCEEDED(debugClient->AttachProcess(
+                        0,
+                        GetCurrentProcessId(),
+                        DEBUG_ATTACH_NONINVASIVE | DEBUG_ATTACH_NONINVASIVE_NO_SUSPEND
+                    ));
+                    if (attached) {
+                        (void)debugControl->WaitForEvent(0, INFINITE);
+                    }
+                    (void
+                        )debugSymbols->AppendSymbolPathWide(getModulePath(NULL).value().parent_path().c_str()
+                        );
+                    (void)debugSymbols->RemoveSymbolOptions(
+                        SYMOPT_NO_CPP | SYMOPT_LOAD_ANYTHING | SYMOPT_NO_UNQUALIFIED_LOADS | SYMOPT_IGNORE_NT_SYMPATH
+                        | SYMOPT_PUBLICS_ONLY | SYMOPT_NO_PUBLICS | SYMOPT_NO_IMAGE_SEARCH
+                    );
+                    (void)debugSymbols->AddSymbolOptions(
+                        SYMOPT_CASE_INSENSITIVE | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES
+                        | SYMOPT_OMAP_FIND_NEAREST | SYMOPT_EXACT_SYMBOLS | SYMOPT_FAIL_CRITICAL_ERRORS
+                        | SYMOPT_AUTO_PUBLICS | SYMOPT_NO_PROMPTS
+                    );
+                }
+            }
+        }
+        return attached;
+    }
+
+    StackTraceEntryInfo getInfo(void const* const address) {
+        std::optional<ULONG64> displacement = 0;
+        std::string           name;
+        std::optional<ULONG>  line = 0;
+        std::string           file;
+        if (ULONG bufSize;
+            S_OK == debugSymbols->GetNameByOffset((ULONG64)(address), NULL, 0, &bufSize, &*displacement)) {
+            std::string buf(bufSize - 1, '\0');
+            if (S_OK == debugSymbols->GetNameByOffset((ULONG64)(address), buf.data(), bufSize, NULL, NULL)) {
+                name = std::move(buf);
+            }
+        }
+        else {
+            displacement = std::nullopt;
+        }
+        if (ULONG bufSize;
+            S_OK == debugSymbols->GetLineByOffset((ULONG64)(address), &*line, NULL, 0, &bufSize, NULL)) {
+            std::string buf(bufSize - 1, '\0');
+            if (S_OK
+                == debugSymbols
+                ->GetLineByOffset((ULONG64)(address), NULL, buf.data(), bufSize, NULL, NULL)) {
+                file = std::move(buf);
+            }
+        }
+        else {
+            line = std::nullopt;
+        }
+        return { displacement, name, line, file };
+    }
+
+    ULONG64 getSymbol(std::string_view sv) {
+        if (ULONG64 res{}; S_OK == debugSymbols->GetOffsetByName(sv.data(), &res)) {
+            return res;
+        }
+        return 0;
+    }
+    // NOLINTEND(readability-convert-member-functions-to-static)
+private:
+    inline static SRWLOCK         srw = SRWLOCK_INIT;
+    inline static IDebugClient* debugClient = NULL;
+    inline static IDebugSymbols3* debugSymbols = NULL;
+    inline static IDebugControl* debugControl = NULL;
+    inline static bool            attached = false;
+    inline static bool            initializeAttempted = false;
+    inline static HMODULE         dbgEng = NULL;
+};
+
+void lockRelease() noexcept {
+    DbgEngData data;
+
+    data.release();
+}
+
+StackTraceEntryInfo getInfo(StacktraceEntry const& entry) {
+    DbgEngData data;
+
+    if (!data.tryInit()) {
+        return {};
+    }
+    return data.getInfo(entry.native_handle());
+}
