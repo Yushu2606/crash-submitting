@@ -1,20 +1,19 @@
-#include <stdexcept>
-#include <minhook.h>
-#include <nlohmann/json.hpp>
-#include <cpr/cpr.h>
-
 #include "main.h"
 #include "crash.h"
 #include "utils.h"
 
+#include <minhook.h>
+#include <nlohmann/json.hpp>
+#include <cpr/cpr.h>
+
+#include <stdexcept>
+
 static int WINAPI DetourMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType)
 {
-    hWnd = NULL;
-
     try
     {
-        std::string title = ConvertLPCWSTRToString(lpCaption);
-        std::string text = ConvertLPCWSTRToString(lpText);
+        std::string title = ConvertWideToByte(lpCaption);
+        std::string text = ConvertWideToByte(lpText);
         nlohmann::json j{
             {"title", title},
             {"text", text} };
@@ -24,7 +23,7 @@ static int WINAPI DetourMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption
         cpr::AsyncResponse p = cpr::PostAsync(url, body);
         if (!p.valid())
         {
-            MessageBoxA(hWnd, "Is not a vaild post request.", "SUBMIT ERROR", MB_ICONERROR);
+            MessageBoxA(nullptr, "Is not a vaild post request.", "SUBMIT ERROR", MB_ICONERROR);
         }
 
         int result = fpMessageBoxW(hWnd, lpText, lpCaption, uType);
@@ -32,13 +31,13 @@ static int WINAPI DetourMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption
         cpr::Response r = p.get();
         if (r.error)
         {
-            MessageBoxA(hWnd, r.error.message.c_str(), "SUBMIT ERROR", MB_ICONERROR);
+            MessageBoxA(nullptr, r.error.message.c_str(), "SUBMIT ERROR", MB_ICONERROR);
         }
         return result;
     }
     catch (std::exception& e)
     {
-        MessageBoxA(hWnd, e.what(), "SUBMIT ERROR", MB_ICONERROR);
+        MessageBoxA(nullptr, e.what(), "SUBMIT ERROR", MB_ICONERROR);
         return fpMessageBoxW(hWnd, lpText, lpCaption, uType);
     }
 }

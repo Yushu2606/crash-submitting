@@ -3,9 +3,9 @@
 #include "crash.h"
 #include "dbgdata.h"
 
-#include "dbghelp.h"
-#include "dbgeng.h"
-#include "psapi.h"
+#include <dbghelp.h>
+#include <dbgeng.h>
+#include <psapi.h>
 
 #include <filesystem>
 #include <stacktrace>
@@ -27,7 +27,7 @@ public:
     {
         // "Phoenix singleton" - destroy and set to null, so that it can be initialized later again
 
-        if (debugClient != NULL)
+        if (debugClient != nullptr)
         {
             if (attached)
             {
@@ -36,25 +36,25 @@ public:
             }
 
             debugClient->Release();
-            debugClient = NULL;
+            debugClient = nullptr;
         }
 
-        if (debugControl != NULL)
+        if (debugControl != nullptr)
         {
             debugControl->Release();
-            debugControl = NULL;
+            debugControl = nullptr;
         }
 
-        if (debugSymbols != NULL)
+        if (debugSymbols != nullptr)
         {
             debugSymbols->Release();
-            debugSymbols = NULL;
+            debugSymbols = nullptr;
         }
 
-        if (dbgEng != NULL)
+        if (dbgEng != nullptr)
         {
             (void)FreeLibrary(dbgEng);
-            dbgEng = NULL;
+            dbgEng = nullptr;
         }
 
         initializeAttempted = false;
@@ -95,7 +95,7 @@ public:
         return result;
     }
 
-    std::optional<std::filesystem::path> getModulePath(void* handle, void* process = NULL)
+    std::optional<std::filesystem::path> getModulePath(LPVOID handle, LPVOID process = nullptr)
     {
         return adaptFixedSizeToAllocatedResult(
             [module = (HMODULE)handle,
@@ -105,12 +105,12 @@ public:
                 size_t valueUsedWithNul{};
                 bool copyFailed{};
                 bool copySucceededWithNoTruncation{};
-                if (process != NULL)
+                if (process != nullptr)
                 {
                     // GetModuleFileNameExW truncates and provides no error or other indication it has done so.
                     // The only way to be sure it didn't truncate is if it didn't need the whole buffer. The
                     // count copied to the buffer includes the nul-character as well.
-                    copiedCount = GetModuleFileNameEx(process, module, value, static_cast<DWORD>(valueLength));
+                    copiedCount = K32GetModuleFileNameExW(process, module, value, static_cast<DWORD>(valueLength));
                     valueUsedWithNul = static_cast<size_t>(copiedCount) + 1;
                     copyFailed = (0 == copiedCount);
                     copySucceededWithNoTruncation = !copyFailed && (copiedCount < valueLength - 1);
@@ -120,7 +120,7 @@ public:
                     // In cases of insufficient buffer, GetModuleFileNameW will return a value equal to
                     // lengthWithNull and set the last error to ERROR_INSUFFICIENT_BUFFER. The count returned does
                     // not include the nul-character
-                    copiedCount = ::GetModuleFileNameW(module, value, static_cast<DWORD>(valueLength));
+                    copiedCount = GetModuleFileNameW(module, value, static_cast<DWORD>(valueLength));
                     valueUsedWithNul = static_cast<size_t>(copiedCount) + 1;
                     copyFailed = (0 == copiedCount);
                     copySucceededWithNoTruncation = !copyFailed && (copiedCount < valueLength);
@@ -148,16 +148,16 @@ public:
                 return false;
             }
 
-            dbgEng = LoadLibraryExW(L"dbgeng.dll", NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
+            dbgEng = LoadLibraryExW(L"dbgeng.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
 
-            if (dbgEng != NULL)
+            if (dbgEng != nullptr)
             {
                 const auto debug_create =
                     reinterpret_cast<decltype(&DebugCreate)>(GetProcAddress(dbgEng, "DebugCreate"));
 
                 // Deliberately not calling CoInitialize[Ex]. DbgEng.h API works fine without it.
                 // COM initialization may have undesired interference with user's code.
-                if (debug_create != NULL && SUCCEEDED(debug_create(IID_IDebugClient, reinterpret_cast<void**>(&debugClient))) && SUCCEEDED(debugClient->QueryInterface(IID_IDebugSymbols3, reinterpret_cast<void**>(&debugSymbols))) && SUCCEEDED(debugClient->QueryInterface(IID_IDebugControl, reinterpret_cast<void**>(&debugControl))))
+                if (debug_create != nullptr && SUCCEEDED(debug_create(IID_IDebugClient, reinterpret_cast<LPVOID*>(&debugClient))) && SUCCEEDED(debugClient->QueryInterface(IID_IDebugSymbols3, reinterpret_cast<LPVOID*>(&debugSymbols))) && SUCCEEDED(debugClient->QueryInterface(IID_IDebugControl, reinterpret_cast<LPVOID*>(&debugControl))))
                 {
                     attached = SUCCEEDED(debugClient->AttachProcess(
                         0,
@@ -167,7 +167,7 @@ public:
                     {
                         (void)debugControl->WaitForEvent(0, INFINITE);
                     }
-                    (void)debugSymbols->AppendSymbolPathWide(getModulePath(NULL).value().parent_path().c_str());
+                    (void)debugSymbols->AppendSymbolPathWide(getModulePath(nullptr).value().parent_path().c_str());
                     (void)debugSymbols->RemoveSymbolOptions(
                         SYMOPT_NO_CPP | SYMOPT_LOAD_ANYTHING | SYMOPT_NO_UNQUALIFIED_LOADS | SYMOPT_IGNORE_NT_SYMPATH | SYMOPT_PUBLICS_ONLY | SYMOPT_NO_PUBLICS | SYMOPT_NO_IMAGE_SEARCH);
                     (void)debugSymbols->AddSymbolOptions(
@@ -185,10 +185,10 @@ public:
         std::optional<ULONG> line = 0;
         std::string file;
         if (ULONG bufSize;
-            S_OK == debugSymbols->GetNameByOffset((ULONG64)(address), NULL, 0, &bufSize, &*displacement))
+            S_OK == debugSymbols->GetNameByOffset((ULONG64)(address), nullptr, 0, &bufSize, &*displacement))
         {
             std::string buf(bufSize - 1, '\0');
-            if (S_OK == debugSymbols->GetNameByOffset((ULONG64)(address), buf.data(), bufSize, NULL, NULL))
+            if (S_OK == debugSymbols->GetNameByOffset((ULONG64)(address), buf.data(), bufSize, nullptr, nullptr))
             {
                 name = std::move(buf);
             }
@@ -198,11 +198,11 @@ public:
             displacement = std::nullopt;
         }
         if (ULONG bufSize;
-            S_OK == debugSymbols->GetLineByOffset((ULONG64)(address), &*line, NULL, 0, &bufSize, NULL))
+            S_OK == debugSymbols->GetLineByOffset((ULONG64)(address), &*line, nullptr, 0, &bufSize, nullptr))
         {
             std::string buf(bufSize - 1, '\0');
             if (S_OK == debugSymbols
-                ->GetLineByOffset((ULONG64)(address), NULL, buf.data(), bufSize, NULL, NULL))
+                ->GetLineByOffset((ULONG64)(address), nullptr, buf.data(), bufSize, nullptr, nullptr))
             {
                 file = std::move(buf);
             }
@@ -225,12 +225,12 @@ public:
     // NOLINTEND(readability-convert-member-functions-to-static)
 private:
     inline static SRWLOCK srw = SRWLOCK_INIT;
-    inline static IDebugClient* debugClient = NULL;
-    inline static IDebugSymbols3* debugSymbols = NULL;
-    inline static IDebugControl* debugControl = NULL;
+    inline static IDebugClient* debugClient = nullptr;
+    inline static IDebugSymbols3* debugSymbols = nullptr;
+    inline static IDebugControl* debugControl = nullptr;
     inline static bool attached = false;
     inline static bool initializeAttempted = false;
-    inline static HMODULE dbgEng = NULL;
+    inline static HMODULE dbgEng = nullptr;
 };
 
 void lockRelease() noexcept

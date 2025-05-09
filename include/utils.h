@@ -1,8 +1,9 @@
 #pragma once
 
-#include <string>
 #include <windows.h>
+
+#include <string>
 
 inline std::string URL;
 
-std::string ConvertLPCWSTRToString(LPCWSTR);
+LPCSTR ConvertWideToByte(LPCWSTR);

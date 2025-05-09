@@ -2,8 +2,8 @@
 #include "dbgdata.h"
 #include "utils.h"
 
-#include "dbghelp.h"
-#include "psapi.h"
+#include <dbghelp.h>
+#include <psapi.h>
 
 #include <filesystem>
 #include <stacktrace>
@@ -67,10 +67,10 @@ LONG NTAPI unhandledExceptionFilter(_In_ struct _EXCEPTION_POINTERS* e)
                 thread,
                 &sf,
                 e->ContextRecord,
-                NULL,
+                nullptr,
                 &SymFunctionTableAccess64,
                 &SymGetModuleBase64,
-                NULL);
+                nullptr);
             if (!correct || !sf.AddrFrame.Offset)
                 break;
             realStacktrace.hash += sf.AddrPC.Offset;
@@ -102,24 +102,26 @@ LONG NTAPI unhandledExceptionFilter(_In_ struct _EXCEPTION_POINTERS* e)
         cpr::Url url(URL);
         cpr::Body body(j.dump());
         cpr::AsyncResponse p = cpr::PostAsync(url, body);
+
+        MessageBoxA(nullptr, "Sorry but we were crashed...", "Crashed!!", MB_ICONERROR);
+
         if (!p.valid())
         {
-            MessageBoxA(NULL, "Is not a vaild post request.", "SUBMIT ERROR", MB_ICONERROR);
+            MessageBoxA(nullptr, "Is not a vaild post request.", "SUBMIT ERROR", MB_ICONERROR);
         }
 
-        MessageBoxA(NULL, "Sorry but we were crashed...", "Crashed!!", MB_ICONERROR);
         p.wait();
         cpr::Response r = p.get();
         if (r.error)
         {
-            MessageBoxA(NULL, r.error.message.c_str(), "SUBMIT ERROR", MB_ICONERROR);
+            MessageBoxA(nullptr, r.error.message.c_str(), "SUBMIT ERROR", MB_ICONERROR);
         }
     }
     catch (std::exception& e)
     {
-        MessageBoxA(NULL, e.what(), "SUBMIT ERROR", MB_ICONERROR);
+        MessageBoxA(nullptr, e.what(), "SUBMIT ERROR", MB_ICONERROR);
     }
-    return NULL;
+    return false;
 }
 
 LONG NTAPI uncatchableExceptionHandler(_In_ struct _EXCEPTION_POINTERS* e)

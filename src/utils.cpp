@@ -1,9 +1,9 @@
 #include "utils.h"
 
-std::string ConvertLPCWSTRToString(LPCWSTR lpcwstr)
+LPCSTR ConvertWideToByte(LPCWSTR w)
 {
-    int size_needed = WideCharToMultiByte(CP_UTF8, 0, lpcwstr, -1, NULL, 0, NULL, NULL);
-    std::string strTo(size_needed, 0);
-    WideCharToMultiByte(CP_UTF8, 0, lpcwstr, -1, &strTo[0], size_needed, NULL, NULL);
-    return strTo;
+    int len = WideCharToMultiByte(CP_UTF8, 0, w, -1, NULL, 0, NULL, NULL);
+    char* s = new char[len];
+    WideCharToMultiByte(CP_UTF8, 0, w, -1, s, len, NULL, NULL);
+    return s;
 }
