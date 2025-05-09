@@ -10,7 +10,7 @@ if not has_config("vs_runtime") then
     set_runtimes("MD")
 end
 
-target("crash_submitting")
+target("rgss_telemetry")
     add_cxflags("/utf-8")
     add_defines(
         "DBGHELP_TRANSLATE_TCHAR",

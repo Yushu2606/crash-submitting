@@ -100,7 +100,7 @@ LONG NTAPI unhandledExceptionFilter(_In_ struct _EXCEPTION_POINTERS* e) {
             MessageBoxA(NULL, "Is not a vaild post request.", "SUBMIT ERROR", MB_ICONERROR);
         }
 
-        MessageBoxA(NULL, "Sorry but we crashed...", "Crashed!!", MB_ICONERROR);
+        MessageBoxA(NULL, "Sorry but we were crashed...", "Crashed!!", MB_ICONERROR);
         p.wait();
         cpr::Response r = p.get();
         if (r.error)
