@@ -5,14 +5,16 @@
 #include <string>
 #include <vector>
 
-struct StackTraceEntryInfo {
+struct StackTraceEntryInfo
+{
     std::optional<ULONG64> displacement;
-    std::string           name;
-    std::optional<ULONG>  line;
-    std::string           file;
+    std::string name;
+    std::optional<ULONG> line;
+    std::string file;
 };
 class Stacktrace;
-class StacktraceEntry {
+class StacktraceEntry
+{
     friend Stacktrace;
     void* address{};
 
@@ -23,9 +25,10 @@ public:
 
     void* native_handle() const { return address; }
 };
-class Stacktrace {
+class Stacktrace
+{
     std::vector<StacktraceEntry> entries;
-    unsigned long long                       hash;
+    unsigned long long hash;
 
 public:
     [[nodiscard]] [[maybe_unused]] static Stacktrace current(size_t skip = 0, size_t maxDepth = ~0ull);

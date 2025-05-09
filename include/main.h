@@ -2,7 +2,7 @@
 
 #include <windows.h>
 
-typedef int(WINAPI *MESSAGEBOXW)(HWND, LPCWSTR, LPCWSTR, UINT);
+typedef int(WINAPI* MESSAGEBOXW)(HWND, LPCWSTR, LPCWSTR, UINT);
 
 inline MESSAGEBOXW fpMessageBoxW = NULL;
 
