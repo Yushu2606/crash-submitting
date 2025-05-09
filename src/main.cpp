@@ -9,6 +9,8 @@
 
 static int WINAPI DetourMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType)
 {
+    hWnd = NULL;
+
     try
     {
         std::string title = ConvertLPCWSTRToString(lpCaption);
@@ -22,7 +24,7 @@ static int WINAPI DetourMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption
         cpr::AsyncResponse p = cpr::PostAsync(url, body);
         if (!p.valid())
         {
-            MessageBoxA(NULL, "Is not a vaild post request.", "SUBMIT ERROR", MB_ICONERROR);
+            MessageBoxA(hWnd, "Is not a vaild post request.", "SUBMIT ERROR", MB_ICONERROR);
         }
 
         int result = fpMessageBoxW(hWnd, lpText, lpCaption, uType);
@@ -30,13 +32,13 @@ static int WINAPI DetourMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption
         cpr::Response r = p.get();
         if (r.error)
         {
-            MessageBoxA(NULL, r.error.message.c_str(), "SUBMIT ERROR", MB_ICONERROR);
+            MessageBoxA(hWnd, r.error.message.c_str(), "SUBMIT ERROR", MB_ICONERROR);
         }
         return result;
     }
     catch (std::exception& e)
     {
-        MessageBoxA(NULL, e.what(), "SUBMIT ERROR", MB_ICONERROR);
+        MessageBoxA(hWnd, e.what(), "SUBMIT ERROR", MB_ICONERROR);
         return fpMessageBoxW(hWnd, lpText, lpCaption, uType);
     }
 }
