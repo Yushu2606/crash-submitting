@@ -28,20 +28,19 @@ LONG NTAPI unhandledExceptionFilter(_In_ struct _EXCEPTION_POINTERS* e)
 {
     try
     {
-        nlohmann::json j{};
-        std::vector<std::string> params;
-        j["exception"] = {
+        nlohmann::json j{
             {"version", {{"script", VERSION}, {"library", LIBRARY_VERSION}}},
             {"address", std::format("{:#x}", (ULONG64)e->ExceptionRecord->ExceptionAddress)},
             {"code", std::format("{:#x}", e->ExceptionRecord->ExceptionCode)},
             {"flags", std::format("{:#x}", e->ExceptionRecord->ExceptionFlags)},
             {"has_record", e->ExceptionRecord->ExceptionRecord ? true : false} };
+        std::vector<std::string> params;
         for (int i = 0; i < e->ExceptionRecord->NumberParameters; ++i)
         {
             params.push_back(std::format("{:#x}", e->ExceptionRecord->ExceptionInformation[i]));
         }
 
-        j["exception"]["params"] = params;
+        j["params"] = params;
 
         std::vector<nlohmann::json> stacktrace;
         STACKFRAME64 sf{};
