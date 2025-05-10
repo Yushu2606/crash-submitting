@@ -4,7 +4,7 @@
 
 #include <string>
 
-constexpr const char* LIBRARY_VERSION = "1.1.2";
+constexpr const char* LIBRARY_VERSION = "1.1.3";
 inline std::string URL;
 inline std::string VERSION;
 
