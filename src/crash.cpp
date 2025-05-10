@@ -30,6 +30,7 @@ LONG NTAPI unhandledExceptionFilter(_In_ struct _EXCEPTION_POINTERS* e)
     {
         nlohmann::json j{
             {"version", {{"script", VERSION}, {"library", LIBRARY_VERSION}}},
+            {"has_3a", std::filesystem::exists("./Game.rgss3a")},
             {"address", std::format("{:#x}", (ULONG64)e->ExceptionRecord->ExceptionAddress)},
             {"code", std::format("{:#x}", e->ExceptionRecord->ExceptionCode)},
             {"flags", std::format("{:#x}", e->ExceptionRecord->ExceptionFlags)},

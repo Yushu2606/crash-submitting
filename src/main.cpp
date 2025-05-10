@@ -6,6 +6,7 @@
 #include <nlohmann/json.hpp>
 #include <cpr/cpr.h>
 
+#include <filesystem>
 #include <stdexcept>
 
 static int WINAPI DetourMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType)
@@ -16,6 +17,7 @@ static int WINAPI DetourMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption
         std::string text = ConvertWideToByte(lpText);
         nlohmann::json j{
             {"version", {{"script", VERSION}, {"library", LIBRARY_VERSION}}},
+            {"has_3a", std::filesystem::exists("./Game.rgss3a")},
             {"title", title},
             {"text", text} };
 
