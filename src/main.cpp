@@ -15,6 +15,7 @@ static int WINAPI DetourMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption
         std::string title = ConvertWideToByte(lpCaption);
         std::string text = ConvertWideToByte(lpText);
         nlohmann::json j{
+            {"version", {{"script", VERSION}, {"library", LIBRARY_VERSION}}},
             {"title", title},
             {"text", text} };
 
@@ -42,9 +43,10 @@ static int WINAPI DetourMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption
     }
 }
 
-BOOL start_hook(LPCSTR url)
+BOOL start_hook(LPCSTR url, LPCSTR version)
 {
     URL = std::string(url);
+    VERSION = std::string(version);
 
     AddVectoredExceptionHandler(1, uncatchableExceptionHandler);
     SetUnhandledExceptionFilter(unhandledExceptionFilter);

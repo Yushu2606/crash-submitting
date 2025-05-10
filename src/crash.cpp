@@ -28,18 +28,21 @@ LONG NTAPI unhandledExceptionFilter(_In_ struct _EXCEPTION_POINTERS* e)
 {
     try
     {
-        nlohmann::json j;
+        nlohmann::json j{};
         std::vector<std::string> params;
         j["exception"] = {
-            {"address", std::to_string((ULONG_PTR)e->ExceptionRecord->ExceptionAddress)},
-            {"code", std::to_string(e->ExceptionRecord->ExceptionCode)},
-            {"flags", std::to_string(e->ExceptionRecord->ExceptionFlags)},
-            {"params", params},
+            {"version", {{"script", VERSION}, {"library", LIBRARY_VERSION}}},
+            {"address", std::format("{:#x}", (ULONG64)e->ExceptionRecord->ExceptionAddress)},
+            {"code", std::format("{:#x}", e->ExceptionRecord->ExceptionCode)},
+            {"flags", std::format("{:#x}", e->ExceptionRecord->ExceptionFlags)},
             {"has_record", e->ExceptionRecord->ExceptionRecord ? true : false} };
         for (int i = 0; i < e->ExceptionRecord->NumberParameters; ++i)
         {
-            params.push_back(std::to_string(e->ExceptionRecord->ExceptionInformation[i]));
+            params.push_back(std::format("{:#x}", e->ExceptionRecord->ExceptionInformation[i]));
         }
+
+        j["exception"]["params"] = params;
+
         std::vector<nlohmann::json> stacktrace;
         STACKFRAME64 sf{};
         sf.AddrPC.Offset = e->ContextRecord->Eip;
@@ -57,7 +60,6 @@ LONG NTAPI unhandledExceptionFilter(_In_ struct _EXCEPTION_POINTERS* e)
             std::vector<decltype(e->ContextRecord->Eip)> addresses;
             size_t hash;
         } realStacktrace;
-
         for (size_t i = 0; i < ~0ull; ++i)
         {
             SetLastError(0);
@@ -76,27 +78,36 @@ LONG NTAPI unhandledExceptionFilter(_In_ struct _EXCEPTION_POINTERS* e)
             realStacktrace.hash += sf.AddrPC.Offset;
             realStacktrace.addresses.push_back(sf.AddrPC.Offset);
         }
+
         Stacktrace stacktraceData = *reinterpret_cast<Stacktrace*>(&realStacktrace);
         for (int i = 0; i < stacktraceData.size(); ++i)
         {
             StackTraceEntryInfo info = getInfo(stacktraceData[i]);
-            nlohmann::json stackj{
-                {"file", info.file},
-                {"name", info.name},
-            };
+            nlohmann::json stackj{};
+
+            if (!info.file.empty())
+            {
+                stackj["file"] = info.file;
+            }
+
+            if (!info.name.empty())
+            {
+                stackj["name"] = info.name;
+            }
 
             if (info.displacement.has_value())
             {
-                stackj["displacement"] = std::to_string(info.displacement.value());
+                stackj["displacement"] = std::format("{:#x}", info.displacement.value());
             }
 
             if (info.line.has_value())
             {
-                stackj["line"] = std::to_string(info.line.value());
+                stackj["line"] = info.line.value();
             }
 
             stacktrace.push_back(stackj);
         }
+
         j["stacktrace"] = stacktrace;
 
         cpr::Url url(URL);
