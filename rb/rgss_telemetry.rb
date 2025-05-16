@@ -1,16 +1,41 @@
-VERSION = "1.5"
-START_TELEMETRY = Win32API.new("rgss_telemetry", "start_hook", "pp", "i")
+module Telemetry
+  VERSION = "1.6"
 
-def main
-  getPrivateProfileString = Win32API.new("kernel32", "GetPrivateProfileString", "ppppip", "i")
-  buffer = [].pack("x256")
-  l = getPrivateProfileString.call("Telemetry", "Url", "", buffer, buffer.size, "./Game.ini")
-  url = buffer[0, l]
-  return if url.nil? or url.empty?
+  ON_START = Win32API.new("rgss_telemetry", "on_start", "pp", "v")
+  ON_ERROR = Win32API.new("rgss_telemetry", "on_error", "ppp", "v")
 
-  start_result = START_TELEMETRY.call(url, VERSION)
-  raise "Telemetry startup failed." unless start_result == 0
-  return url
+  def self.on_start
+    get_private_profile_string = Win32API.new("kernel32", "GetPrivateProfileString", "ppppip", "i")
+    buffer = [].pack("x256")
+    l = get_private_profile_string.call("Telemetry", "Url", "", buffer, buffer.size, "./Game.ini")
+    url = buffer[0, l]
+    return if url.nil? or url.empty?
+
+    ON_START.call(url, VERSION)
+  end
+
+  def self.on_error(typename, message, stack)
+    stack.each { |e|
+      e.gsub!(/\{(\d+)\}\:(\d+)/i) { |m|
+        "Script #{$1} -- #{ScriptNames[$1.to_i]}, Line: #{$2}"
+      }
+    }
+    ON_ERROR.call(typename, message, stack.join("\n"))
+  end
 end
 
-URL = main
+alias base_rgss_main rgss_main
+
+def rgss_main(*args, &block)
+  begin
+    base_rgss_main(*args, &block)
+  rescue => e
+    Telemetry.on_error(e.class.to_s, e.to_s, e.backtrace)
+  end
+end
+
+Telemetry.on_start
+
+ScriptNames = {}
+
+$RGSS_SCRIPTS.each_with_index { |s, i| ScriptNames[i] = s[1] }

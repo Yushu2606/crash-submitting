@@ -2,8 +2,8 @@
 
 #include <windows.h>
 
-typedef int(WINAPI* MESSAGEBOXW)(HWND, LPCWSTR, LPCWSTR, UINT);
-
-inline MESSAGEBOXW fpMessageBoxW = NULL;
-
-extern "C" __declspec(dllexport) BOOL start_hook(LPCSTR, LPCSTR);
+extern "C"
+{
+    __declspec(dllexport) void on_start(LPCSTR, LPCSTR);
+    __declspec(dllexport) void on_error(LPCSTR, LPCSTR, LPCSTR);
+}

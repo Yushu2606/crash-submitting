@@ -4,8 +4,14 @@
 
 #include <string>
 
-constexpr const char* LIBRARY_VERSION = "1.1.3";
+#include <cpr/cpr.h>
+
+constexpr const char* LIBRARY_VERSION = "1.2.0";
 inline std::string URL;
 inline std::string VERSION;
 
-LPCSTR ConvertWideToByte(LPCWSTR);
+LPCSTR ConvertWideToMulti(LPCWSTR);
+LPCWSTR ConvertMultiToWide(LPCSTR);
+bool CheckRTPInstalled();
+void CheckUpdate(cpr::Response);
+void Restart();
