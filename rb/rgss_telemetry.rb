@@ -1,7 +1,8 @@
 module Telemetry
   VERSION = "1.6"
+  IS_TEST_VERSION = true
 
-  ON_START = Win32API.new("rgss_telemetry", "on_start", "pp", "v")
+  ON_START = Win32API.new("rgss_telemetry", "on_start", "ppi", "v")
   ON_ERROR = Win32API.new("rgss_telemetry", "on_error", "ppp", "v")
 
   def self.on_start
@@ -11,7 +12,7 @@ module Telemetry
     url = buffer[0, l]
     return if url.nil? or url.empty?
 
-    ON_START.call(url, VERSION)
+    ON_START.call(url, VERSION, IS_TEST_VERSION)
   end
 
   def self.on_error(typename, message, stack)

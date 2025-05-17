@@ -59,7 +59,14 @@ void CheckUpdate(cpr::Response r)
     {
         return;
     }
+    
+    LPCSTR k = IS_TEST_VERSION ? "test" : "release";
+    if (!j.contains(k))
+    {
+        return;
+    }
 
+    j = j[k];
     if (!j.contains("version"))
     {
         return;
@@ -67,6 +74,11 @@ void CheckUpdate(cpr::Response r)
 
     std::string sVersion = j["version"].get<std::string>();
     if (sVersion.empty())
+    {
+        return;
+    }
+
+    if (CompareVersion(VERSION, sVersion))
     {
         return;
     }
@@ -102,4 +114,49 @@ void CheckUpdate(cpr::Response r)
     {
         ShellExecute(hWnd, TEXT("open"), pUrl.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
     }
+}
+
+int CompareVersion(std::string_view version1, std::string_view version2) {
+    size_t i = 0, j = 0;
+    const size_t n1 = version1.size(), n2 = version2.size();
+
+    while (i < n1 || j < n2)
+    {
+        long long num1 = 0;
+        if (i < n1)
+        {
+            size_t start = i;
+            while (i < n1 && version1[i] != '.')
+            {
+                ++i;
+            }
+
+            num1 = std::strtoll(std::string(version1.substr(start, i - start)).c_str(), nullptr, 10);
+            ++i;
+        }
+
+        long long num2 = 0;
+        if (j < n2) 
+        {
+            size_t start = j;
+            while (j < n2 && version2[j] != '.')
+            {
+                ++j;
+            }
+
+            num2 = std::strtoll(std::string(version2.substr(start, j - start)).c_str(), nullptr, 10);
+            ++j;
+        }
+
+        if (num1 < num2)
+        {
+            return -1;
+        }
+
+        if (num1 > num2)
+        {
+            return 1;
+        }
+    }
+    return 0;
 }

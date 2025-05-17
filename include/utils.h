@@ -9,6 +9,7 @@
 constexpr const char* LIBRARY_VERSION = "1.2.0";
 inline std::string URL;
 inline std::string VERSION;
+inline bool IS_TEST_VERSION;
 
 LPCSTR ConvertWideToMulti(LPCWSTR);
 LPCWSTR ConvertMultiToWide(LPCSTR);
