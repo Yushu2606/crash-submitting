@@ -1,8 +1,10 @@
 module Telemetry
   # 发行版本
   VERSION = "1.6"
+  # 是否为测试版
+  IS_TEST_VERSION = true
 
-  ON_START = Win32API.new("rgss_telemetry", "on_start", "pp", "v")
+  ON_START = Win32API.new("rgss_telemetry", "on_start", "ppi", "v")
   ON_ERROR = Win32API.new("rgss_telemetry", "on_error", "ppp", "v")
 
   def self.on_start
@@ -12,7 +14,7 @@ module Telemetry
     @@url = buffer[0, l]
     return if self.unactive?
 
-    ON_START.call(@@url, VERSION)
+    ON_START.call(@@url, VERSION, IS_TEST_VERSION && 1 || 0)
   end
 
   def self.on_error(typename, message, stack)
