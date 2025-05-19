@@ -1,11 +1,11 @@
 #pragma once
 
-#include <windows.h>
-
 #include <string>
+#include <string_view>
+#include <vector>
 
-constexpr const char* LIBRARY_VERSION = "1.1.3";
+constexpr const char* LIBRARY_VERSION = "1.2.1";
 inline std::string URL;
 inline std::string VERSION;
 
-LPCSTR ConvertWideToByte(LPCWSTR);
+std::vector<std::string_view> Slice(std::string_view, std::string_view);

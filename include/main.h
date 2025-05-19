@@ -1,9 +1,7 @@
 #pragma once
 
-#include <windows.h>
-
-typedef int(WINAPI* MESSAGEBOXW)(HWND, LPCWSTR, LPCWSTR, UINT);
-
-inline MESSAGEBOXW fpMessageBoxW = NULL;
-
-extern "C" __declspec(dllexport) BOOL start_hook(LPCSTR, LPCSTR);
+extern "C"
+{
+    __declspec(dllexport) void on_start(const char*, const char*);
+    __declspec(dllexport) void on_error(const char*, const char*, const char*);
+}

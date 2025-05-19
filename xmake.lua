@@ -1,9 +1,6 @@
 add_rules("mode.debug", "mode.release")
 
-add_requires(
-    "minhook v1.3.3",
-    "nlohmann_json v3.11.3"
-)
+add_requires("nlohmann_json v3.11.3")
 add_requires("cpr 1.11.1", { configs = { ssl = true } })
 
 if not has_config("vs_runtime") then
@@ -22,9 +19,5 @@ target("rgss_telemetry")
     set_languages("c++latest")
     add_files("src/**.cpp")
     add_includedirs("include")
-    add_packages(
-        "minhook",
-        "nlohmann_json",
-        "cpr"
-    )
+    add_packages("cpr", "nlohmann_json")
     add_syslinks("dbghelp")

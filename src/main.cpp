@@ -2,71 +2,60 @@
 #include "crash.h"
 #include "utils.h"
 
-#include <minhook.h>
-#include <nlohmann/json.hpp>
-#include <cpr/cpr.h>
-
 #include <filesystem>
-#include <stdexcept>
 
-static int WINAPI DetourMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType)
+#include <cpr/cpr.h>
+#include <nlohmann/json.hpp>
+
+void on_start(const char* url_p, const char* version_p)
 {
-    try
-    {
-        std::string title = ConvertWideToByte(lpCaption);
-        std::string text = ConvertWideToByte(lpText);
-        nlohmann::json j{
-            {"version", {{"script", VERSION}, {"library", LIBRARY_VERSION}}},
-            {"has_3a", std::filesystem::exists("./Game.rgss3a")},
-            {"title", title},
-            {"text", text} };
-
-        cpr::Url url(URL);
-        cpr::Body body(j.dump());
-        cpr::AsyncResponse p = cpr::PostAsync(url, body);
-        if (!p.valid())
-        {
-            MessageBoxA(nullptr, "Is not a vaild post request.", "SUBMIT ERROR", MB_ICONERROR);
-        }
-
-        int result = fpMessageBoxW(hWnd, lpText, lpCaption, uType);
-        p.wait();
-        cpr::Response r = p.get();
-        if (r.error)
-        {
-            MessageBoxA(nullptr, r.error.message.c_str(), "SUBMIT ERROR", MB_ICONERROR);
-        }
-        return result;
-    }
-    catch (std::exception& e)
-    {
-        MessageBoxA(nullptr, e.what(), "SUBMIT ERROR", MB_ICONERROR);
-        return fpMessageBoxW(hWnd, lpText, lpCaption, uType);
-    }
-}
-
-BOOL start_hook(LPCSTR url, LPCSTR version)
-{
-    URL = std::string(url);
-    VERSION = std::string(version);
+    URL = std::string(url_p);
+    VERSION = std::string(version_p);
 
     AddVectoredExceptionHandler(1, uncatchableExceptionHandler);
     SetUnhandledExceptionFilter(unhandledExceptionFilter);
+}
 
-    if (MH_Initialize() != MH_OK)
+void on_error(const char* typename_p, const char* message_p, const char* stack_p)
+{
+    auto hWnd = GetDesktopWindow();
+    ShowWindow(hWnd, SW_HIDE);
+
+    auto stack = Slice(stack_p, "\r\n");
+    if (stack.size() <= 1)
     {
-        return 1;
+        stack = Slice(stack_p, "\n");
     }
 
-    if (MH_CreateHook(&MessageBoxW, &DetourMessageBoxW, reinterpret_cast<LPVOID*>(&fpMessageBoxW)) != MH_OK)
+    std::vector<nlohmann::json> jStack;
+    jStack.reserve(stack.size());
+    for (auto& trace : stack)
     {
-        return 1;
+        auto jTrace = nlohmann::json::parse(trace);
+        for (auto& [k, v] : jTrace.items())
+        {
+            if (v.get<std::string>().empty())
+            {
+                jTrace.erase(k);
+            }
+        }
+
+        jStack.push_back(std::move(jTrace));
     }
 
-    if (MH_EnableHook(&MessageBoxW) != MH_OK)
+    std::string type(typename_p);
+    nlohmann::json j{
+        {"_version", {{"game", std::move(VERSION)}, {"module", LIBRARY_VERSION}}},
+        {"packaged", std::filesystem::exists("./Game.rgss3a")},
+        {"type", std::move(type)},
+        {"stack", std::move(jStack)} };
+    std::string message(message_p);
+    if (!message.empty())
     {
-        return 1;
+        j["message"] = std::move(message);
     }
 
-    return 0;
+    cpr::Url url(URL);
+    cpr::Body body(j.dump());
+    cpr::Post(url, body);
 }

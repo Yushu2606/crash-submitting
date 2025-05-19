@@ -11,134 +11,109 @@
 #include <cpr/cpr.h>
 #include <nlohmann/json.hpp>
 
-[[nodiscard]] [[maybe_unused]] Stacktrace Stacktrace::current(size_t skip, size_t maxDepth)
+LONG WINAPI unhandledExceptionFilter(_In_ struct _EXCEPTION_POINTERS* ExceptionInfo)
 {
-    auto s = std::stacktrace::current(skip + 1, maxDepth);
-    Stacktrace res;
-    res.entries.reserve(s.size());
-    for (auto& entry : s)
+    auto hWnd = GetDesktopWindow();
+    ShowWindow(hWnd, SW_HIDE);
+
+    nlohmann::json j{
+        {"_version", {{"game", VERSION}, {"module", LIBRARY_VERSION}}},
+        {"packaged", std::filesystem::exists("./Game.rgss3a")},
+        {"address", std::format("{:#x}", reinterpret_cast<size_t>(ExceptionInfo->ExceptionRecord->ExceptionAddress))},
+        {"code", std::format("{:#x}", ExceptionInfo->ExceptionRecord->ExceptionCode)},
+        {"flags", std::format("{:#x}", ExceptionInfo->ExceptionRecord->ExceptionFlags)},
+        {"has_record", ExceptionInfo->ExceptionRecord->ExceptionRecord != nullptr} };
+    std::vector<std::string> params;
+    params.reserve(ExceptionInfo->ExceptionRecord->NumberParameters);
+    for (size_t i{}; i < ExceptionInfo->ExceptionRecord->NumberParameters; ++i)
     {
-        res.entries.emplace_back(entry.native_handle());
+        params.push_back(std::format("{:#x}", ExceptionInfo->ExceptionRecord->ExceptionInformation[i]));
     }
-    res.hash = std::hash<std::stacktrace>{}(s);
-    return res;
-}
 
-LONG NTAPI unhandledExceptionFilter(_In_ struct _EXCEPTION_POINTERS* e)
-{
-    try
+    j["params"] = std::move(params);
+
+    std::vector<nlohmann::json> stack;
+    STACKFRAME64 sf{};
+    sf.AddrPC.Offset = ExceptionInfo->ContextRecord->Eip;
+    sf.AddrFrame.Offset = ExceptionInfo->ContextRecord->Ebp;
+    sf.AddrStack.Offset = ExceptionInfo->ContextRecord->Esp;
+    sf.AddrPC.Mode = AddrModeFlat;
+    sf.AddrFrame.Mode = AddrModeFlat;
+    sf.AddrStack.Mode = AddrModeFlat;
+
+    auto process = GetCurrentProcess();
+    auto thread = GetCurrentThread();
+
+    struct RealStacktrace
     {
-        nlohmann::json j{
-            {"version", {{"script", VERSION}, {"library", LIBRARY_VERSION}}},
-            {"has_3a", std::filesystem::exists("./Game.rgss3a")},
-            {"address", std::format("{:#x}", (ULONG64)e->ExceptionRecord->ExceptionAddress)},
-            {"code", std::format("{:#x}", e->ExceptionRecord->ExceptionCode)},
-            {"flags", std::format("{:#x}", e->ExceptionRecord->ExceptionFlags)},
-            {"has_record", e->ExceptionRecord->ExceptionRecord ? true : false} };
-        std::vector<std::string> params;
-        for (int i = 0; i < e->ExceptionRecord->NumberParameters; ++i)
-        {
-            params.push_back(std::format("{:#x}", e->ExceptionRecord->ExceptionInformation[i]));
-        }
+        std::vector<DWORD64> addresses;
+        DWORD64 hash{};
+    } realStacktrace;
 
-        j["params"] = params;
-
-        std::vector<nlohmann::json> stacktrace;
-        STACKFRAME64 sf{};
-        sf.AddrPC.Offset = e->ContextRecord->Eip;
-        sf.AddrFrame.Offset = e->ContextRecord->Ebp;
-        sf.AddrStack.Offset = e->ContextRecord->Esp;
-        sf.AddrPC.Mode = AddrModeFlat;
-        sf.AddrFrame.Mode = AddrModeFlat;
-        sf.AddrStack.Mode = AddrModeFlat;
-
-        HANDLE process = GetCurrentProcess();
-        HANDLE thread = GetCurrentThread();
-
-        struct RealStacktrace
-        {
-            std::vector<decltype(e->ContextRecord->Eip)> addresses;
-            size_t hash;
-        } realStacktrace;
-        for (size_t i = 0; i < ~0ull; ++i)
-        {
-            SetLastError(0);
-            BOOL correct = StackWalk64(
-                IMAGE_FILE_MACHINE_I386,
-                process,
-                thread,
-                &sf,
-                e->ContextRecord,
-                nullptr,
-                &SymFunctionTableAccess64,
-                &SymGetModuleBase64,
-                nullptr);
-            if (!correct || !sf.AddrFrame.Offset)
-                break;
-            realStacktrace.hash += sf.AddrPC.Offset;
-            realStacktrace.addresses.push_back(sf.AddrPC.Offset);
-        }
-
-        Stacktrace stacktraceData = *reinterpret_cast<Stacktrace*>(&realStacktrace);
-        for (int i = 0; i < stacktraceData.size(); ++i)
-        {
-            StackTraceEntryInfo info = getInfo(stacktraceData[i]);
-            nlohmann::json stackj{};
-
-            if (!info.file.empty())
-            {
-                stackj["file"] = info.file;
-            }
-
-            if (!info.name.empty())
-            {
-                stackj["name"] = info.name;
-            }
-
-            if (info.displacement.has_value())
-            {
-                stackj["displacement"] = std::format("{:#x}", info.displacement.value());
-            }
-
-            if (info.line.has_value())
-            {
-                stackj["line"] = info.line.value();
-            }
-
-            stacktrace.push_back(stackj);
-        }
-
-        j["stacktrace"] = stacktrace;
-
-        cpr::Url url(URL);
-        cpr::Body body(j.dump());
-        cpr::AsyncResponse p = cpr::PostAsync(url, body);
-
-        MessageBoxA(nullptr, "Sorry but we were crashed...", "Crashed!!", MB_ICONERROR);
-
-        if (!p.valid())
-        {
-            MessageBoxA(nullptr, "Is not a vaild post request.", "SUBMIT ERROR", MB_ICONERROR);
-        }
-
-        p.wait();
-        cpr::Response r = p.get();
-        if (r.error)
-        {
-            MessageBoxA(nullptr, r.error.message.c_str(), "SUBMIT ERROR", MB_ICONERROR);
-        }
-    }
-    catch (std::exception& e)
+    for (DWORD64 i{}; i < ~0ull; ++i)
     {
-        MessageBoxA(nullptr, e.what(), "SUBMIT ERROR", MB_ICONERROR);
+        SetLastError(0);
+        auto correct = StackWalk64(
+            IMAGE_FILE_MACHINE_I386,
+            process,
+            thread,
+            &sf,
+            ExceptionInfo->ContextRecord,
+            nullptr,
+            &SymFunctionTableAccess64,
+            &SymGetModuleBase64,
+            nullptr);
+        if (!correct || !sf.AddrFrame.Offset)
+        {
+            break;
+        }
+
+        realStacktrace.hash += sf.AddrPC.Offset;
+        realStacktrace.addresses.push_back(sf.AddrPC.Offset);
     }
+
+    auto& stacktrace = *reinterpret_cast<Stacktrace*>(&realStacktrace);
+    stack.reserve(stacktrace.size());
+    for (size_t i{}; i < stacktrace.size(); ++i)
+    {
+        auto info = getInfo(stacktrace[i]);
+        nlohmann::json stackj;
+
+        if (!info.file.empty())
+        {
+            stackj["file"] = std::move(info.file);
+        }
+
+        if (!info.name.empty())
+        {
+            stackj["name"] = std::move(info.name);
+        }
+
+        if (info.displacement.has_value())
+        {
+            stackj["displacement"] = std::format("{:#x}", info.displacement.value());
+        }
+
+        if (info.line.has_value())
+        {
+            stackj["line"] = info.line.value();
+        }
+
+        stack.push_back(std::move(stackj));
+    }
+
+    j["stack"] = std::move(stack);
+
+    cpr::Url url(URL);
+    cpr::Body body(j.dump());
+    cpr::Post(url, body);
     return false;
 }
 
-LONG NTAPI uncatchableExceptionHandler(_In_ struct _EXCEPTION_POINTERS* e)
+LONG NTAPI uncatchableExceptionHandler(struct _EXCEPTION_POINTERS* ExceptionInfo)
 {
     static std::atomic_bool onceFlag{ false };
-    auto const& code = e->ExceptionRecord->ExceptionCode;
+    auto const& code = ExceptionInfo->ExceptionRecord->ExceptionCode;
     if (code == STATUS_HEAP_CORRUPTION || code == STATUS_STACK_BUFFER_OVERRUN
         // need to add all can't catch status code
         )
@@ -146,7 +121,7 @@ LONG NTAPI uncatchableExceptionHandler(_In_ struct _EXCEPTION_POINTERS* e)
         if (!onceFlag)
         {
             onceFlag = true;
-            unhandledExceptionFilter(e);
+            unhandledExceptionFilter(ExceptionInfo);
         }
     }
     return EXCEPTION_CONTINUE_SEARCH;

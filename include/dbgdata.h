@@ -1,3 +1,5 @@
+// From github.com@LiteLDev/LeviLamina:main@src/ll/api/utils/StacktraceUtils.h
+
 #pragma once
 
 #include <windows.h>
@@ -6,14 +8,8 @@
 #include <string>
 #include <vector>
 
-struct StackTraceEntryInfo
-{
-    std::optional<ULONG64> displacement;
-    std::string name;
-    std::optional<ULONG> line;
-    std::string file;
-};
 class Stacktrace;
+
 class StacktraceEntry
 {
     friend Stacktrace;
@@ -29,12 +25,12 @@ public:
 class Stacktrace
 {
     std::vector<StacktraceEntry> entries;
-    unsigned long long hash;
+    DWORD64 hash{};
 
 public:
     [[nodiscard]] [[maybe_unused]] static Stacktrace current(size_t skip = 0, size_t maxDepth = ~0ull);
 
-    unsigned long long getHash() const { return hash; }
+    DWORD64 getHash() const { return hash; }
 
     size_t size() const { return entries.size(); }
 
@@ -43,4 +39,12 @@ public:
     StacktraceEntry const& operator[](size_t index) const { return entries[index]; }
 };
 
-StackTraceEntryInfo getInfo(StacktraceEntry const&);
+struct StackTraceEntryInfo
+{
+    std::optional<ULONG64> displacement;
+    std::string name;
+    std::optional<ULONG> line;
+    std::string file;
+};
+
+[[nodiscard]] [[maybe_unused]] StackTraceEntryInfo getInfo(StacktraceEntry const&);
