@@ -3,10 +3,8 @@
 #include "utils.h"
 
 #include <dbghelp.h>
-#include <psapi.h>
 
 #include <filesystem>
-#include <stacktrace>
 
 #include <cpr/cpr.h>
 #include <nlohmann/json.hpp>
