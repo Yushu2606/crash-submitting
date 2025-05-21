@@ -24,8 +24,9 @@ void on_start(const char* url_p, const char* version_p, bool is_test_version)
 
 void on_error(const char* typename_p, const char* message_p, const char* stack_p)
 {
+    std::string type(typename_p);
     auto hWnd = GetDesktopWindow();
-    if (typename_p == "Errno::ENOENT" || !CheckRTPInstalled())
+    if (type == "Errno::ENOENT" || !CheckRTPInstalled())
     {
         if (MessageBox(hWnd, TEXT("您好像没有正确安装RPG Maker VX Ace Run Time Package，是否前往官网进行下载？"), TEXT("彼阳的汉化组"), MB_YESNO | MB_ICONEXCLAMATION) == IDYES)
         {
@@ -58,7 +59,6 @@ void on_error(const char* typename_p, const char* message_p, const char* stack_p
         jStack.push_back(std::move(jTrace));
     }
 
-    std::string type(typename_p);
     nlohmann::json j{
         {"_version", {{"game", std::move(VERSION)}, {"module", LIBRARY_VERSION}}},
         {"packaged", std::filesystem::exists("./Game.rgss3a")},
