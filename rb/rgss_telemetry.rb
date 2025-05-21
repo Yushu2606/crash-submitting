@@ -9,7 +9,7 @@ module Telemetry
 
   def self.on_start
     get_private_profile_string = Win32API.new("kernel32", "GetPrivateProfileString", "ppppip", "i")
-    buffer = [].pack("x256")
+    buffer = [].pack("x260")
     l = get_private_profile_string.call("Telemetry", "Url", "", buffer, buffer.size, "./Game.ini")
     @@url = buffer[0, l]
     return if self.unactive?

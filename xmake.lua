@@ -1,6 +1,6 @@
 add_rules("mode.debug", "mode.release")
 
-add_requires("nlohmann_json v3.11.3")
+add_requires("nlohmann_json v3.12.0")
 add_requires("cpr 1.11.1", { configs = { ssl = true } })
 
 if not has_config("vs_runtime") then
@@ -8,7 +8,7 @@ if not has_config("vs_runtime") then
 end
 
 target("rgss_telemetry")
-    add_cxflags("/utf-8")
+    set_toolchains("llvm")
     add_defines(
         "DBGHELP_TRANSLATE_TCHAR",
         "NOMINMAX", -- To avoid conflicts with std::min and std::max.
