@@ -8,7 +8,7 @@ if not has_config("vs_runtime") then
 end
 
 target("rgss_telemetry")
-    add_cxflags("/utf-8")
+    set_toolchains("llvm")
     add_defines(
         "DBGHELP_TRANSLATE_TCHAR",
         "NOMINMAX", -- To avoid conflicts with std::min and std::max.

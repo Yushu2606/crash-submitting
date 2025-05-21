@@ -28,7 +28,7 @@ class Stacktrace
     DWORD64 hash{};
 
 public:
-    [[nodiscard]] [[maybe_unused]] static Stacktrace current(size_t skip = 0, size_t maxDepth = ~0ull);
+    [[nodiscard]] [[maybe_unused]] static Stacktrace current(size_t skip = 0, DWORD64 maxDepth = ~0ull);
 
     DWORD64 getHash() const { return hash; }
 

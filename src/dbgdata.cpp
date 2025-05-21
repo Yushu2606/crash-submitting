@@ -89,7 +89,7 @@ std::optional<std::filesystem::path> getModulePath(HANDLE handle, HANDLE process
             { return std::filesystem::path(path); });
 }
 
-[[nodiscard]] [[maybe_unused]] Stacktrace Stacktrace::current(size_t skip, size_t maxDepth)
+[[nodiscard]] [[maybe_unused]] Stacktrace Stacktrace::current(size_t skip, DWORD64 maxDepth)
 {
     auto s = std::stacktrace::current(skip + 1, maxDepth);
     Stacktrace res;
