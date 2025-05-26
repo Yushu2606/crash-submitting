@@ -1,6 +1,6 @@
 module Telemetry
   # 发行版本
-  VERSION = "1.6"
+  VERSION = "1.7"
 
   ON_START = Win32API.new("rgss_telemetry", "on_start", "pp", "v")
   ON_ERROR = Win32API.new("rgss_telemetry", "on_error", "ppp", "v")

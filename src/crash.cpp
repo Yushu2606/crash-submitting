@@ -14,6 +14,31 @@ LONG WINAPI unhandledExceptionFilter(_In_ struct _EXCEPTION_POINTERS* ExceptionI
     auto hWnd = GetDesktopWindow();
     ShowWindow(hWnd, SW_HIDE);
 
+    static auto langId = []
+        {
+            DWORD res{};
+            if (GetLocaleInfoEx(
+                LOCALE_NAME_SYSTEM_DEFAULT,
+                LOCALE_SNAME | LOCALE_RETURN_NUMBER,
+                reinterpret_cast<LPWSTR>(&res),
+                sizeof(res) / sizeof(wchar_t)) == 0)
+            {
+                res = 0;
+            }
+            return res;
+        }();
+    static auto nt = GetModuleHandle(TEXT("ntdll"));
+
+    wchar_t* msg = nullptr;
+    auto size = FormatMessage(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_IGNORE_INSERTS,
+        nt,
+        ExceptionInfo->ExceptionRecord->ExceptionCode,
+        langId,
+        reinterpret_cast<LPWSTR>(&msg),
+        NULL,
+        nullptr);
+
     nlohmann::json j{
         {"_version", {{"game", VERSION}, {"module", LIBRARY_VERSION}}},
         {"packaged", std::filesystem::exists("./Game.rgss3a")},
@@ -21,6 +46,11 @@ LONG WINAPI unhandledExceptionFilter(_In_ struct _EXCEPTION_POINTERS* ExceptionI
         {"code", std::format("{:#x}", ExceptionInfo->ExceptionRecord->ExceptionCode)},
         {"flags", std::format("{:#x}", ExceptionInfo->ExceptionRecord->ExceptionFlags)},
         {"has_record", ExceptionInfo->ExceptionRecord->ExceptionRecord != nullptr} };
+    if (size > 0)
+    {
+        j["message"] = msg;
+    }
+
     std::vector<std::string> params;
     params.reserve(ExceptionInfo->ExceptionRecord->NumberParameters);
     for (size_t i{}; i < ExceptionInfo->ExceptionRecord->NumberParameters; ++i)
