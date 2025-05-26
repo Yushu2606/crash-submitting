@@ -4,7 +4,7 @@ module Telemetry
   # 是否为测试版
   IS_TEST_VERSION = true
 
-  ON_START = Win32API.new("rgss_telemetry", "on_start", "ppi", "v")
+  ON_START = Win32API.new("rgss_telemetry", "on_start", "ppi", "i")
   ON_ERROR = Win32API.new("rgss_telemetry", "on_error", "ppp", "v")
 
   def self.on_start
@@ -12,9 +12,10 @@ module Telemetry
     buffer = [].pack("x260")
     l = get_private_profile_string.call("Telemetry", "Url", "", buffer, buffer.size, "./Game.ini")
     @@url = buffer[0, l]
+    @@succeed = true
     return if self.unactive?
 
-    ON_START.call(@@url, VERSION, IS_TEST_VERSION && 1 || 0)
+    @@succeed = ON_START.call(@@url, VERSION, IS_TEST_VERSION && 1 || 0)
   end
 
   def self.on_error(typename, message, stack)
@@ -30,7 +31,7 @@ module Telemetry
   end
 
   def self.unactive?
-    @@url.nil? or @@url.empty?
+    @@url.nil? or @@url.empty? or not @@succeed
   end
 end
 

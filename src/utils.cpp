@@ -119,7 +119,7 @@ bool CheckRTPInstalled()
 
 void CheckUpdate(cpr::Response r)
 {
-    if (r.status_code != 200 || r.error)
+    if (r.error || r.status_code != 200)
     {
         return;
     }
