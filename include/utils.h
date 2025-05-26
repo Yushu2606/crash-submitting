@@ -6,7 +6,7 @@
 
 #include <cpr/cpr.h>
 
-constexpr const char* LIBRARY_VERSION = "1.2.1";
+constexpr const char* LIBRARY_VERSION = "1.2.2";
 inline std::string URL;
 inline std::string VERSION;
 inline bool IS_TEST_VERSION;

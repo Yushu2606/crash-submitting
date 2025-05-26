@@ -1,6 +1,6 @@
 module Telemetry
   # 发行版本
-  VERSION = "1.6"
+  VERSION = "1.7"
   # 是否为测试版
   IS_TEST_VERSION = true
 
